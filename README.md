@@ -30,20 +30,20 @@ http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-init.
 * modify "{thisrepo}/[linux_builder|windows_builder]/build-stack-configuration.json the correct parameter values.
 
 [build-stack-configuration.json]
-...
+```sh
 "InstanceType": "r4.4xlarge" --> This will be the Instance type you want to use to bake the image
 "BaseAMI": "ami-24e64944", --> This will be the base public AMI ID in the region you want to use.
 "Keypair": "us-west-2", --> This will be the keypair to assign to the Instance.
 "PipelineStack": "WIN2012-bake-pipe" --> This will need to be the {PipelineStack} name you created previously.
-...
+```
 
 [test-stack-configuration.json]
-...
+```sh
 "InstanceType": "r4.4xlarge" --> This will be the Instance type you want to use to launch the test instance
 "BaseAMI": "******", --> This will be updated by the pipeline, you can leave it blank
 "Keypair": "us-west-2", --> This will be the keypair to assign to the Instance.
 "PipelineStack": "WIN2012-bake-pipe" --> This will need to be the {PipelineStack} name you created previously.
-...
+```
 
 ### Building Linux AMI   
 To deploy "{thisrepo}/linux_builder/*" consists of all the json files you need to commit to the "{PipelineStack}-coderepo" and "{PipelineStack}-userconfig" 
