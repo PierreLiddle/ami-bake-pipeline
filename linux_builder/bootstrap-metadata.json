@@ -1,0 +1,30 @@
+{
+  "packages": {
+    "yum": {
+      "httpd": []
+    }
+  },
+  "files": {
+    "/var/www/html/index.html": {
+      "content": {
+        "Fn::Join": [
+          "",
+          [
+            "Everything is A OK"
+          ]
+        ]
+      },
+      "mode": "000755",
+      "owner": "root",
+      "group": "root"
+    }
+  },
+  "services": {
+    "sysvinit": {
+      "httpd": {
+        "enabled": "true",
+        "ensureRunning": "true"
+      }
+    }
+  }
+}

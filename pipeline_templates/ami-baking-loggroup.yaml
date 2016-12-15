@@ -1,0 +1,189 @@
+Parameters:
+ PipelineStackName:
+    Type: String
+    Description: "Enter the Stackname of your pipeline"
+Resources:
+  ##### Log Group
+  BakeLogGroupCFN: 
+    Type: "AWS::Logs::LogGroup"
+    Properties: 
+      LogGroupName: 
+            Fn::Join:
+              - ''
+              - - !Ref PipelineStackName
+                - "-"
+                - "BakeLogGroupCFN"
+  BakeLogGroupApplicationSystems: 
+    Type: "AWS::Logs::LogGroup"
+    Properties: 
+      LogGroupName: 
+            Fn::Join:
+              - ''
+              - - !Ref PipelineStackName
+                - "-"
+                - "BakeLogGroupApplicationSystems"
+  BakeLogGroupSecurity: 
+    Type: "AWS::Logs::LogGroup"
+    Properties: 
+      LogGroupName: 
+            Fn::Join:
+              - ''
+              - - !Ref PipelineStackName
+                - "-"
+                - "BakeLogGroupSecurity"
+  BakeLogGroupEC2Config: 
+    Type: "AWS::Logs::LogGroup"
+    Properties: 
+      LogGroupName: 
+            Fn::Join:
+              - ''
+              - - !Ref PipelineStackName
+                - "-"
+                - "BakeLogGroupEC2Config"
+  BakeLogGroupSSM: 
+    Type: "AWS::Logs::LogGroup"
+    Properties: 
+      LogGroupName: 
+            Fn::Join:
+              - ''
+              - - !Ref PipelineStackName
+                - "-"
+                - "BakeLogGroupSSM"
+  TestLogGroupCFN: 
+    Type: "AWS::Logs::LogGroup"
+    Properties: 
+      LogGroupName: 
+            Fn::Join:
+              - ''
+              - - !Ref PipelineStackName
+                - "-"
+                - "TestLogGroupCFN"
+  TestLogGroupApplicationSystems: 
+    Type: "AWS::Logs::LogGroup"
+    Properties: 
+      LogGroupName: 
+            Fn::Join:
+              - ''
+              - - !Ref PipelineStackName
+                - "-"
+                - "TestLogGroupApplicationSystems"
+  TestLogGroupSecurity: 
+    Type: "AWS::Logs::LogGroup"
+    Properties: 
+      LogGroupName: 
+            Fn::Join:
+              - ''
+              - - !Ref PipelineStackName
+                - "-"
+                - "TestLogGroupSecurity"
+  TestLogGroupEC2Config: 
+    Type: "AWS::Logs::LogGroup"
+    Properties: 
+      LogGroupName: 
+            Fn::Join:
+              - ''
+              - - !Ref PipelineStackName
+                - "-"
+                - "TestLogGroupEC2Config"
+  TestLogGroupSSM: 
+    Type: "AWS::Logs::LogGroup"
+    Properties: 
+      LogGroupName: 
+            Fn::Join:
+              - ''
+              - - !Ref PipelineStackName
+                - "-"
+                - "TestLogGroupSSM"
+  ##### 
+  BKLogLinuxMSG: 
+    Type: "AWS::Logs::LogGroup"
+    Properties: 
+      LogGroupName: 
+            Fn::Join:
+              - ''
+              - - !Ref PipelineStackName
+                - "-"
+                - "BKLogLinuxMSG"
+  BKLogLinuxCFNINIT: 
+    Type: "AWS::Logs::LogGroup"
+    Properties: 
+      LogGroupName: 
+            Fn::Join:
+              - ''
+              - - !Ref PipelineStackName
+                - "-"
+                - "BKLogLinuxCFN-INIT"
+  BKLogLinuxCFNINITCMD: 
+    Type: "AWS::Logs::LogGroup"
+    Properties: 
+      LogGroupName: 
+            Fn::Join:
+              - ''
+              - - !Ref PipelineStackName
+                - "-"
+                - "BKLogLinuxCFN-INIT-CMD"
+  BKLogLinuxCLOUDINIT: 
+    Type: "AWS::Logs::LogGroup"
+    Properties: 
+      LogGroupName: 
+            Fn::Join:
+              - ''
+              - - !Ref PipelineStackName
+                - "-"
+                - "BKLogLinuxCLOUD-INIT"
+  BKLogLinuxCLOUDINITOUTPUT: 
+    Type: "AWS::Logs::LogGroup"
+    Properties: 
+      LogGroupName: 
+            Fn::Join:
+              - ''
+              - - !Ref PipelineStackName
+                - "-"
+                - "BKLogLinuxCLOUD-INIT-OUTPUT"
+  TSLogLinuxMSG: 
+    Type: "AWS::Logs::LogGroup"
+    Properties: 
+      LogGroupName: 
+            Fn::Join:
+              - ''
+              - - !Ref PipelineStackName
+                - "-"
+                - "TSLogLinuxMSG"
+  TSLogLinuxCFNINIT: 
+    Type: "AWS::Logs::LogGroup"
+    Properties: 
+      LogGroupName: 
+            Fn::Join:
+              - ''
+              - - !Ref PipelineStackName
+                - "-"
+                - "TSLogLinuxCFN-INIT"
+  TSLogLinuxCFNINITCMD: 
+    Type: "AWS::Logs::LogGroup"
+    Properties: 
+      LogGroupName: 
+            Fn::Join:
+              - ''
+              - - !Ref PipelineStackName
+                - "-"
+                - "TSLogLinuxCFN-INIT-CMD"
+  TSLogLinuxCLOUDINIT: 
+    Type: "AWS::Logs::LogGroup"
+    Properties: 
+      LogGroupName: 
+            Fn::Join:
+              - ''
+              - - !Ref PipelineStackName
+                - "-"
+                - "TSLogLinuxCLOUD-INIT"
+  TSLogLinuxCLOUDINITOUTPUT: 
+    Type: "AWS::Logs::LogGroup"
+    Properties: 
+      LogGroupName: 
+            Fn::Join:
+              - ''
+              - - !Ref PipelineStackName
+                - "-"
+                - "TSLogLinuxCLOUD-INIT-OUTPUT"
+  #####
+

@@ -1,0 +1,8 @@
+{
+  "Parameters": {
+    "InstanceType": "t2.large",
+    "BaseAMI": "",
+    "Keypair": "us-west-2",
+    "PipelineStack": "LINUX-bake-pipe"
+  }
+}

@@ -1,0 +1,257 @@
+{
+  "Outputs": {
+    "URL": {
+      "Description": "InstanceURL",
+      "Value": {
+        "Fn::GetAtt": [
+          "EC2Instance",
+          "PublicDnsName"
+        ]
+      }
+    }
+  },
+  "Parameters": {
+    "Keypair": {
+      "Type": "AWS::EC2::KeyPair::KeyName"
+    },
+    "InstanceType": {
+      "Type": "String"
+    },
+    "BaseAMI": {
+      "Type": "String"
+    },
+    "PipelineStack": {
+      "Type": "String"
+    }
+  },
+  "Resources": {
+    "EC2Instance": {
+      "Type": "AWS::EC2::Instance",
+      "Metadata": {
+        "AWS::CloudFormation::Init": {
+          "configSets": {
+            "bootstrap": [
+              "configure-awslogs",
+              "cfn-config"
+            ]
+          },
+          "configure-awslogs": {
+            "packages": {
+              "yum": {
+                "awslogs": []
+              }
+            },
+            "files": {
+              "/etc/awslogs/awslogs.conf": {
+                "content": {
+                  "Fn::Join": [
+                    "", [
+                      "[general]\n",
+                      "state_file = /var/lib/awslogs/agent-state\n",
+                      "\n",
+                      "[/var/log/messages]\n",
+                      "datetime_format = %b %d %H:%M:%S\n",
+                      "file = /var/log/messages\n",
+                      "buffer_duration = 5000\n",
+                      "log_stream_name = {instance_id}/var/log/messages\n",
+                      "initial_position = start_of_file\n",
+                      "log_group_name =  ", {
+                        "Ref": "PipelineStack"
+                      },
+                      "-TSLogLinuxMSG",
+                      "\n",
+                      "[/var/log/cloud-init.log]\n",
+                      "datetime_format = %b %d %H:%M:%S\n",
+                      "file = /var/log/cloud-init.log\n",
+                      "buffer_duration = 5000\n",
+                      "log_stream_name = {instance_id}/var/log/cloud-init.log\n",
+                      "initial_position = start_of_file\n",
+                      "log_group_name =  ", {
+                        "Ref": "PipelineStack"
+                      },
+                      "-TSLogLinuxCLOUD-INIT",
+                      "\n",
+                      "[/var/log/cloud-init-output.log]\n",
+                      "datetime_format = %b %d %H:%M:%S\n",
+                      "file = /var/log/cloud-init.log\n",
+                      "buffer_duration = 5000\n",
+                      "log_stream_name = {instance_id}/var/log/cloud-init-output.log\n",
+                      "initial_position = start_of_file\n",
+                      "log_group_name =  ", {
+                        "Ref": "PipelineStack"
+                      },
+                      "-TSLogLinuxCLOUD-INIT-OUTPUT",
+                      "\n",
+                      "[/var/log/cfn-init.log]\n",
+                      "datetime_format = %b %d %H:%M:%S\n",
+                      "file = /var/log/cfn-init.log\n",
+                      "buffer_duration = 5000\n",
+                      "log_stream_name = {instance_id}/var/log/cfn-init.log\n",
+                      "initial_position = start_of_file\n",
+                      "log_group_name =  ", {
+                        "Ref": "PipelineStack"
+                      },
+                      "-TSLogLinuxCFN-INIT",
+                      "\n",
+                      "[/var/log/cfn-init-cmd.log]\n",
+                      "datetime_format = %b %d %H:%M:%S\n",
+                      "file = /var/log/cfn-init-cmd.log\n",
+                      "buffer_duration = 5000\n",
+                      "log_stream_name = {instance_id}/var/log/cfn-init-cmd.log\n",
+                      "initial_position = start_of_file\n",
+                      "log_group_name =  ", {
+                        "Ref": "PipelineStack"
+                      },
+                      "-TSLogLinuxCFN-INIT-CMD",
+                      "\n"
+                    ]
+                  ]
+                }
+              },
+              "/etc/awslogs/awscli.conf": {
+                "content": {
+                  "Fn::Join": [
+                    "", [
+                      "[plugins]\n",
+                      "cwlogs = cwlogs\n",
+                      "[default]\n",
+                      "region = ", {
+                        "Ref": "AWS::Region"
+                      },
+                      "\n"
+                    ]
+                  ]
+                }
+              }
+            },
+            "services": {
+              "sysvinit": {
+                "awslogs": {
+                  "enabled": "true",
+                  "ensureRunning": "true",
+                  "files": [
+                    "/etc/awslogs/awscli.conf",
+                    "/etc/awslogs/awslogs.conf"
+                  ]
+                }
+              }
+            }
+          },
+          "cfn-config": {
+            "files": {
+              "/etc/cfn/cfn-hup.conf": {
+                "content": {
+                  "Fn::Join": [
+                    "", [
+                      "[main]\n",
+                      "stack=", {
+                        "Ref": "AWS::StackId"
+                      },
+                      "\n",
+                      "region=", {
+                        "Ref": "AWS::Region"
+                      },
+                      "\n"
+                    ]
+                  ]
+                },
+                "mode": "000400",
+                "owner": "root",
+                "group": "root"
+              },
+              "/etc/cfn/hooks.d/cfn-auto-reloader.conf": {
+                "content": {
+                  "Fn::Join": [
+                    "", [
+                      "[cfn-auto-reloader-hook]\n",
+                      "triggers=post.update\n",
+                      "path=Resources.EC2Instance.Metadata.AWS::CloudFormation::Init\n",
+                      "action=/opt/aws/bin/cfn-init -v ",
+                      "         --stack ", {
+                        "Ref": "AWS::StackName"
+                      },
+                      "         --resource EC2Instance ",
+                      "         --configsets bootstrap ",
+                      "         --region ", {
+                        "Ref": "AWS::Region"
+                      },
+                      "\n"
+                    ]
+                  ]
+                },
+                "mode": "000400",
+                "owner": "root",
+                "group": "root"
+              }
+            },
+            "services": {
+              "sysvinit": {
+                "cfn-hup": {
+                  "enabled": "true",
+                  "ensureRunning": "true",
+                  "files": [
+                    "/etc/cfn/cfn-hup.conf",
+                    "/etc/cfn/hooks.d/cfn-auto-reloader.conf"
+                  ]
+                }
+              }
+            }
+          },
+          "user-config": {}
+        }
+      },
+      "Properties": {
+        "ImageId": {
+          "Ref": "BaseAMI"
+        },
+        "IamInstanceProfile": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${PipelineStack}-AMIBuilderInstanceProfile"
+          }
+        },
+        "InstanceType": {
+          "Ref": "InstanceType"
+        },
+        "KeyName": {
+          "Ref": "Keypair"
+        },
+        "UserData": {
+          "Fn::Base64": {
+            "Fn::Join": [
+              "", [
+                "#!/bin/bash -xe\n",
+                "yum update -y aws-cfn-bootstrap\n",
+                "/opt/aws/bin/cfn-init -v ",
+                "         --stack ", {
+                  "Ref": "AWS::StackName"
+                },
+                "         --resource EC2Instance ",
+                "         --configsets bootstrap ",
+                "         --region ", {
+                  "Ref": "AWS::Region"
+                },
+                "\n",
+                "#Signal Status back to Instance\n",
+                "/opt/aws/bin/cfn-signal -e $? ",
+                "         --stack ", {
+                  "Ref": "AWS::StackName"
+                },
+                "         --resource EC2Instance ",
+                "         --region ", {
+                  "Ref": "AWS::Region"
+                },
+                "\n"
+              ]
+            ]
+          }
+        }
+      },
+      "CreationPolicy": {
+        "ResourceSignal": {
+          "Count": 1,
+          "Timeout": "PT12H"
+        }
+      }
+    }
+  }
+}

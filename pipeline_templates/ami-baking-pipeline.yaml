@@ -1,0 +1,1122 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Outputs:
+  AMIBakeExecStateMachineOut:
+    Value: !GetAtt AMIBakeExexStateMachine.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-AMIBakeExexStateMachine"
+  AMIBakeCreateStepFuncMachOut:
+    Value: !GetAtt AMIBakeExecuteCreateSFN.stateMachineARN
+    Export:
+      Name: !Sub "${AWS::StackName}-AMIBakeCreateStepFuncMach"
+  AMIBuilderInstProfile:
+    Value: !Ref AMIBuilderInstanceProfile
+    Export:
+      Name: !Sub "${AWS::StackName}-AMIBuilderInstanceProfile"
+  AMIBuildRole: 
+    Value: !GetAtt AMIBuilderRole.Arn
+    Export: 
+      Name: !Sub "${AWS::StackName}-AMIBuilderRole"
+Parameters: 
+  StepFunctionsCodeBucket:
+    Type: String
+    Description: "Enter the bucketname containing stepfunctions bucket"
+    Default: "demo-pipeline-sfncode-bucket"
+  BuildAMITemplate: 
+    Type: String
+    Description: "Enter the file name of your CloudFormation Build AMI template."
+    Default: "build_ami.json"
+  BuildAMIConfig: 
+    Type: String
+    Description: "Enter the file name of your CloudFormation Build AMI config."
+    Default: "build-stack-configuration.json"  
+  TestAMITemplate: 
+    Type: String
+    Description: "Enter the file name of your CloudFormation test AMI template."
+    Default: "test_ami.json"
+  TestAMIConfig: 
+    Type: String
+    Description: "Enter the file name of your CloudFormation test AMI config."
+    Default: "test-stack-configuration.json"
+  BootstrapMetadata: 
+    Type: String
+    Description: "Enter the file name of your BootstrapMetadata (this will be injected to one of the deployed configset in the Clouformation Build AMI template )."
+    Default: "bootstrap-metadata.json"
+Resources:
+  SNSTopic:
+    Type: "AWS::SNS::Topic"
+    Properties: 
+      DisplayName: !Sub "${AWS::StackName}-SNSTopic"
+  AMITable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: "ID"
+        AttributeType: "S"
+      KeySchema:
+      - AttributeName: "ID"
+        KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: "5"
+        WriteCapacityUnits: "5"
+  TestAMIFunction: 
+    Type: "AWS::Lambda::Function"
+    Properties: 
+      FunctionName: !Sub ${AWS::StackName}-codepipeline-check_http_service
+      Handler: "index.lambda_handler"
+      Role: 
+        Fn::GetAtt: 
+          - "LambdaExecutionRole"
+          - "Arn"
+      Runtime: "python2.7"
+      MemorySize: "512"
+      Timeout: "300"
+      Code: 
+        ZipFile: 
+            !Sub |
+            import base64, uuid, httplib, urlparse, json, boto3, commands, zipfile, StringIO, os, calendar, time
+            from botocore.client import Config
+            def lambda_handler(event, context):
+                print ('event output')
+                print (json.dumps(event))
+                try:
+                    s3 = boto3.resource(
+                            's3', 
+                            aws_access_key_id= event['CodePipeline.job']['data']['artifactCredentials']['accessKeyId'],
+                            aws_secret_access_key= event['CodePipeline.job']['data']['artifactCredentials']['secretAccessKey'],
+                            aws_session_token= event['CodePipeline.job']['data']['artifactCredentials']['sessionToken'],
+                            config=Config(signature_version='s3v4')
+                            )
+                    cpipeclient = boto3.client('codepipeline')
+                    unpack_artefact(event,s3)
+                    
+                    ##PROCESS ARTEFACT###
+                    with open('/tmp/TestOutput') as json_boostrap_metadata:
+                        jsonProdAMI = json.load(json_boostrap_metadata)
+                        print ("Checking URL http://"+jsonProdAMI['URL'])
+                    URL = jsonProdAMI['URL']
+                    conn = httplib.HTTPConnection(URL,timeout=280)
+                    conn.request("HEAD", "/")
+                    r1 = conn.getresponse()
+                    if str(r1.status) == str(200):
+                        print ("URL "+ jsonProdAMI['URL'] + "Returned 200 OK")
+                        signal_success(event,cpipeclient)
+                    else:
+                        print ("URL "+ jsonProdAMI['URL'] + "Did not return 200 OK")
+                        signal_failure(event,cpipeclient)
+                    #####################
+                except:
+                    signal_failure(event,cpipeclient)
+                    raise 
+            def unpack_artefact(event,s3):  
+                input_artefacts = event['CodePipeline.job']['data']['inputArtifacts']
+                print(commands.getoutput('rm -Rvf /tmp/*'))
+                for inartefact in input_artefacts:
+                    inartbucket = inartefact['location']['s3Location']['bucketName']
+                    inartobject = inartefact['location']['s3Location']['objectKey']
+                    inputzip = inartobject.split("/")
+                    s3.meta.client.download_file(inartbucket, inartobject, '/tmp/'+inputzip[2])
+                    zip_ref = zipfile.ZipFile('/tmp/'+inputzip[2], 'r')
+                    zip_ref.extractall('/tmp/')
+                    zip_ref.close()
+            def signal_success(event,cpipeclient):
+                cpipeclient.put_job_success_result(
+                        jobId=event['CodePipeline.job']['id']
+                        )
+            def signal_failure(event,cpipeclient):
+                cpipeclient.put_job_failure_result(
+                        jobId=event['CodePipeline.job']['id'],
+                        failureDetails={'type': 'JobFailed','message': 'Lambda Execution Failed, Check Lambda Log'}
+                        )
+  CodepipelineServiceRole: 
+    Type: "AWS::IAM::Role"
+    Properties: 
+      AssumeRolePolicyDocument: 
+        Statement: 
+          - 
+            Effect: "Allow"
+            Principal: 
+              Service: 
+                - "codepipeline.amazonaws.com"
+                - "cloudformation.amazonaws.com"
+            Action: 
+              - "sts:AssumeRole"
+      Path: "/"
+      Policies: 
+        - 
+          PolicyName: "Policy"
+          PolicyDocument: 
+            Statement: 
+              - 
+                Effect: "Allow"
+                Action: 
+                    - "ec2:*"
+                    - "cloudformation:*"
+                    - "codecommit:*"
+                    - "iam:*"
+                    - "lambda:*"
+                    - "s3:*"
+                    - "sts:*"
+                    - "ssm:*"
+                Resource: "*"
+  LambdaExecutionRole: 
+    Type: "AWS::IAM::Role"
+    Properties: 
+      AssumeRolePolicyDocument: 
+        Statement: 
+          - 
+            Effect: "Allow"
+            Principal: 
+              Service: 
+                - "lambda.amazonaws.com"
+                - "states.us-west-2.amazonaws.com"
+            Action: 
+              - "sts:AssumeRole"
+      Path: "/"
+      Policies: 
+        - 
+          PolicyName: "Policies"
+          PolicyDocument: 
+            Statement: 
+              - 
+                Effect: "Allow"
+                Action: 
+                  - "codepipeline:PutJobSuccessResult"
+                  - "codepipeline:PutJobFailureResult"
+                  - "logs:*"
+                  - "s3:*"
+                  - "ec2:*"
+                  - "sns:*"
+                  - "dynamodb:*"
+                  - "lambda:*"
+                  - "states:*"
+                  - "iam:*"
+                Resource: "*"
+  AMIBuilderRole: 
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement: 
+          -
+            Effect: "Allow"
+            Principal: 
+              Service:
+                - "ec2.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+      Policies: 
+        -
+          PolicyName: "EC2BuilderAccess"
+          PolicyDocument:
+            Statement: 
+              -
+                Effect: "Allow"
+                Action: 
+                  - "ssm:*"
+                  - "ec2messages:*"
+                  - "cloudwatch:*"
+                  - "ec2:*"
+                  - "ds:*"
+                  - "logs:*"
+                  - "s3:*"
+                  - "states:*"
+                Resource: "*"
+  AMIBuilderInstanceProfile:
+    Type: "AWS::IAM::InstanceProfile"
+    Properties:
+      Path: "/"
+      Roles: 
+        - !Ref AMIBuilderRole
+  AMIBakeExecuteCreateSFN: 
+    Type: "Custom::AMIBakeExecuteCreateSFN"
+    Properties: 
+      ServiceToken: !GetAtt AMIBakeCreateStepFuncMach.Arn
+      StackName: 
+        Ref: "AWS::StackName"
+      region: 
+        Ref: "AWS::Region"
+      sfnmachinename: !Sub "${AWS::StackName}-bake_me_ami"
+      accountid: !Ref AWS::AccountId
+      sfnroleARN: !GetAtt LambdaExecutionRole.Arn 
+      waitstopfuncARN: !GetAtt AMIBakeStepCheckInstanceStop.Arn 
+      createamifuncARN: !GetAtt AMIBakeStepCreateAMIFromInstance.Arn 
+      waitamifuncARN: !GetAtt AMIBakeStepCheckAMIAvailable.Arn 
+      sendsignalfuncARN: !GetAtt AMIBakeStepSignal.Arn 
+  AMIBakeCreateStepFuncMach: 
+    Type: "AWS::Lambda::Function"
+    Properties: 
+      FunctionName: !Sub ${AWS::StackName}-stepfunctions-create_state_machine
+      Handler: "index.lambda_handler"
+      Role: 
+        Fn::GetAtt: 
+          - "LambdaExecutionRole"
+          - "Arn"
+      Runtime: "python2.7"
+      MemorySize: "512"
+      Timeout: "300"
+      Code: 
+        S3Bucket: !Ref StepFunctionsCodeBucket
+        S3Key: "create_states_machine.zip"
+  AMIBakeExexStateMachine: 
+    Type: "AWS::Lambda::Function"
+    Properties: 
+      FunctionName: !Sub "${AWS::StackName}-stepfunctions-execute_state_maschine"
+      Handler: "index.lambda_handler"
+      Role: 
+        Fn::GetAtt: 
+          - "LambdaExecutionRole"
+          - "Arn"
+      Runtime: "python2.7"
+      MemorySize: "512"
+      Timeout: "300"
+      Code: 
+        S3Bucket: !Ref StepFunctionsCodeBucket
+        S3Key: "execute_states_machine.zip"
+  AMIBakeStepCheckInstanceStop: 
+    Type: "AWS::Lambda::Function"
+    Properties: 
+      FunctionName: !Sub ${AWS::StackName}-stepfunctions-check_instance_stop
+      Handler: "index.handler"
+      Role: 
+        Fn::GetAtt: 
+          - "LambdaExecutionRole"
+          - "Arn"
+      Runtime: "nodejs4.3"
+      MemorySize: "512"
+      Timeout: "300"
+      Code: 
+        ZipFile: 
+            !Sub |
+                exports.handler = (event, context, callback) => {
+                //callback(null, 'Hello from Lambda');
+                var AWS = require('aws-sdk');
+                var ec2 = new AWS.EC2();
+                var params = {InstanceIds: [event.Id]};
+                ec2.describeInstances(params, function(err, data) {
+                  if (err) 
+                        console.log(err, err.stack); // an error occurred
+                  else     
+                        console.log(JSON.stringify(data));
+                        var StatusCode = JSON.stringify(data.Reservations[0].Instances[0].State.Code)
+                        if (StatusCode == 80){
+                            console.log('Instance is stopped');
+                            callback(null, event);
+                          }
+                        else
+                          {
+                            context.fail("InstanceNotStopped");
+                            console.log('Instance is not stopped');
+                          }
+                            
+                  });
+                };
+  AMIBakeStepCheckAMIAvailable: 
+    Type: "AWS::Lambda::Function"
+    Properties: 
+      FunctionName: !Sub ${AWS::StackName}-stepfunctions-check_ami_available
+      Handler: "index.handler"
+      Role: 
+        Fn::GetAtt: 
+          - "LambdaExecutionRole"
+          - "Arn"
+      Runtime: "nodejs4.3"
+      MemorySize: "512"
+      Timeout: "300"
+      Code: 
+        ZipFile: 
+            !Sub |
+            exports.handler = (event, context, callback) => {
+                //callback(null, 'Hello from Lambda');
+                var AWS = require('aws-sdk');
+                var ec2 = new AWS.EC2();
+                var params = {ImageIds: [event.CreatedAMI]};
+                ec2.describeImages(params, function(err, data) {
+                  if (err) 
+                        console.log(err, err.stack); // an error occurred
+                  else     
+                        console.log(JSON.stringify(data));
+                        var State = JSON.stringify(data.Images[0].State)
+                        if (State === '"available"')
+                        {
+                            console.log('Instance is available');
+                            callback(null, event);
+                        }
+                        else
+                        {
+                            context.fail("InstanceNotAvailable");
+                            console.log('Instance is not Available');
+                        }
+                            
+                });
+            };
+  AMIBakeStepCreateAMIFromInstance: 
+    Type: "AWS::Lambda::Function"
+    Properties: 
+      FunctionName: !Sub ${AWS::StackName}-stepfunctions-create_ami_from_instance
+      Handler: "index.lambda_handler"
+      Role: 
+        Fn::GetAtt: 
+          - "LambdaExecutionRole"
+          - "Arn"
+      Runtime: "python2.7"
+      MemorySize: "512"
+      Timeout: "300"
+      Code: 
+        ZipFile: 
+            !Sub |
+            import boto3
+            import datetime
+            import time
+            def lambda_handler(event, context):
+                Id = event['Id']
+                StackName = event['StackName']
+                client = boto3.client('ec2')
+                print('creating AMI of instance '+ Id)
+                createdatetime = str(int(datetime.datetime.now().strftime("%s%f")) * 1000)
+                ec2createimage_response = client.create_image(
+                            InstanceId=Id,
+                            Name=StackName+'.'+createdatetime
+                    )
+                print('AMI '+str(ec2createimage_response['ImageId'])+ ' created')
+                amijson = event
+                amijson['CreatedAMI']=str(ec2createimage_response['ImageId'])
+                amijson['Createdatetime']=str(createdatetime)
+                return(amijson)
+  AMIBakeStepSignal: 
+    Type: "AWS::Lambda::Function"
+    Properties: 
+      FunctionName: !Sub ${AWS::StackName}-stepfunctions-send_signal
+      Handler: "index.lambda_handler"
+      Role: 
+        Fn::GetAtt: 
+          - "LambdaExecutionRole"
+          - "Arn"
+      Runtime: "python2.7"
+      MemorySize: "512"
+      Timeout: "300"
+      Code: 
+        ZipFile: 
+            !Sub |
+            import base64
+            import uuid
+            import httplib
+            import urlparse
+            import json
+            def send_response(request, response, status=None, reason=None):
+                if status is not None:
+                    response['Status'] = status
+                if reason is not None:
+                    response['Reason'] = reason
+                if 'ResponseURL' in request and request['ResponseURL']:
+                    response['PhysicalResourceId'] = "CreateAMI"
+                    response['StackId'] = request['StackId']
+                    response['RequestId'] = request['RequestId']
+                    response['LogicalResourceId'] = request['LogicalResourceId']
+                    url = urlparse.urlparse(request['ResponseURL'])
+                    body = json.dumps(response)
+                    https = httplib.HTTPSConnection(url.hostname)
+                    https.request('PUT', url.path+'?'+url.query, body)
+                print(json.dumps(response))
+                return response
+            def lambda_handler(event, context):
+                CreatedAMI=event['CreatedAMI']
+                CreatedTIME=event['Createdatetime']
+                CreatedNAME=event['StackName']+"."+event['Createdatetime']
+                respond={}
+                ami={}
+                ami['CreatedAMI']=CreatedAMI
+                ami['CreatedTIME']=CreatedTIME
+                ami['CreatedNAME']=CreatedNAME
+                respond['Data']=ami
+                respond['Status']="SUCCESS"
+                respond['Reason']='AMI Successfully Baked'
+                return send_response(event, respond)                  
+  ComposeBuildAMITemplateFunction: 
+    Type: "AWS::Lambda::Function"
+    Properties: 
+      FunctionName: !Sub ${AWS::StackName}-codepipeline-compose_build_template
+      Handler: "index.lambda_handler"
+      Role: 
+        Fn::GetAtt: 
+          - "LambdaExecutionRole"
+          - "Arn"
+      Runtime: "python2.7"
+      MemorySize: "512"
+      Timeout: "300"
+      Code: 
+        ZipFile: 
+            !Sub |
+            import base64, uuid, httplib, urlparse, json, boto3, commands, zipfile, StringIO, os, calendar, time
+            from botocore.client import Config
+            def lambda_handler(event, context):
+                print ('### EVENT OUTPUT ###')
+                print (json.dumps(event))
+                try:
+                    s3 = boto3.resource(
+                            's3', 
+                            aws_access_key_id= event['CodePipeline.job']['data']['artifactCredentials']['accessKeyId'],
+                            aws_secret_access_key= event['CodePipeline.job']['data']['artifactCredentials']['secretAccessKey'],
+                            aws_session_token= event['CodePipeline.job']['data']['artifactCredentials']['sessionToken'],
+                            config=Config(signature_version='s3v4')
+                            )
+                    cpipeclient = boto3.client('codepipeline')
+                    unpack_artefact(event,s3)
+                    ##PROCESS ARTEFACT###
+                    with open('/tmp/bootstrap-metadata.json') as json_boostrap_metadata:
+                        d = json.load(json_boostrap_metadata)
+                    with open('/tmp/build_ami.json') as json_file:
+                        json_decoded = json.load(json_file)
+                        json_decoded['Resources']['EC2BuilderInstance']['Metadata']['AWS::CloudFormation::Init']['user-config'] = d
+                        print (json.dumps(json_decoded))
+                        f = open('/tmp/build_ami.json','w')
+                        f.write(json.dumps(json_decoded)) 
+                        f.close()
+                    #####################
+                    pack_artefact(event,s3)
+                    signal_success(event,cpipeclient)
+                except:
+                    signal_failure(event,cpipeclient)
+                    raise
+            def unpack_artefact(event,s3):  
+                input_artefacts = event['CodePipeline.job']['data']['inputArtifacts']
+                print(commands.getoutput('rm -Rvf /tmp/*'))
+                for inartefact in input_artefacts:
+                    inartbucket = inartefact['location']['s3Location']['bucketName']
+                    inartobject = inartefact['location']['s3Location']['objectKey']
+                    inputzip = inartobject.split("/")
+                    s3.meta.client.download_file(inartbucket, inartobject, '/tmp/'+inputzip[2])
+                    zip_ref = zipfile.ZipFile('/tmp/'+inputzip[2], 'r')
+                    zip_ref.extractall('/tmp/')
+                    zip_ref.close()
+            def pack_artefact(event,s3):
+                outartbucket = event['CodePipeline.job']['data']['outputArtifacts'][0]['location']['s3Location']['bucketName']
+                outartobject = event['CodePipeline.job']['data']['outputArtifacts'][0]['location']['s3Location']['objectKey']
+                outputzip =  outartobject.split("/")
+                z = zipfile.ZipFile('/tmp/'+ outputzip[2], 'w')
+                z.write('/tmp/build_ami.json','build_ami.json')
+                z.write('/tmp/build-stack-configuration.json','build-stack-configuration.json')
+                z.close()
+                s3.meta.client.upload_file('/tmp/'+ outputzip[2], outartbucket, outartobject, ExtraArgs={'ServerSideEncryption': 'aws:kms'})
+                print(commands.getoutput('ls -Rv /tmp/'))
+            def signal_success(event,cpipeclient):
+                cpipeclient.put_job_success_result(
+                        jobId=event['CodePipeline.job']['id']
+                        )
+            def signal_failure(event,cpipeclient):
+                cpipeclient.put_job_failure_result(
+                        jobId=event['CodePipeline.job']['id'],
+                        failureDetails={'type': 'JobFailed','message': 'Lambda Execution Failed, Check Lambda Log'}
+                        )
+  ComposeBuildAMITemplateFunctionOutputs: 
+    Type: "AWS::Lambda::Function"
+    Properties: 
+      FunctionName: !Sub ${AWS::StackName}-codepipeline-compose_build_template_outputs
+      Handler: "index.lambda_handler"
+      Role: 
+        Fn::GetAtt: 
+          - "LambdaExecutionRole"
+          - "Arn"
+      Runtime: "python2.7"
+      MemorySize: "512"
+      Timeout: "300"
+      Code: 
+        ZipFile: 
+            !Sub |
+            import base64, uuid, httplib, urlparse, json, boto3, commands, zipfile, StringIO, os, calendar, time
+            from botocore.client import Config
+            def lambda_handler(event, context):
+                print ('### EVENT OUTPUT ###')
+                print (json.dumps(event))
+                h = {"Value": { "Ref": "BaseAMI" } }  
+                i = {"Value": { "Fn::GetAtt": [ "XSFN", "CreatedAMI" ] } }
+                j = {"Value": { "Fn::GetAtt": [ "XSFN", "CreatedTIME"] } }
+                k = {"Value": { "Fn::GetAtt": [ "XSFN", "CreatedNAME"] } }
+                try:
+                    s3 = boto3.resource(
+                            's3', 
+                            aws_access_key_id= event['CodePipeline.job']['data']['artifactCredentials']['accessKeyId'],
+                            aws_secret_access_key= event['CodePipeline.job']['data']['artifactCredentials']['secretAccessKey'],
+                            aws_session_token= event['CodePipeline.job']['data']['artifactCredentials']['sessionToken'],
+                            config=Config(signature_version='s3v4')
+                            )
+                    cpipeclient = boto3.client('codepipeline')
+                    unpack_artefact(event,s3)
+                    ##PROCESS ARTEFACT###
+                    with open('/tmp/build_ami.json') as json_file:
+                        jsnd = json.load(json_file)
+                        jsnd['Outputs'] = {}
+                        jsnd['Outputs']['SourceAMICreated'] = h                       
+                        jsnd['Outputs']['CustomAMICreated'] = i                        
+                        jsnd['Outputs']['CustomAMICreatedTime'] = j                        
+                        jsnd['Outputs']['CustomAMICreatedName'] = k   
+                        print (json.dumps(jsnd))
+                        f = open('/tmp/build_ami.json','w')
+                        f.write(json.dumps(jsnd)) 
+                        f.close()
+                    #####################
+                    pack_artefact(event,s3)
+                    signal_success(event,cpipeclient)
+                except:
+                    signal_failure(event,cpipeclient)
+                    raise
+            def unpack_artefact(event,s3):  
+                input_artefacts = event['CodePipeline.job']['data']['inputArtifacts']
+                print(commands.getoutput('rm -Rvf /tmp/*'))
+                for inartefact in input_artefacts:
+                    inartbucket = inartefact['location']['s3Location']['bucketName']
+                    inartobject = inartefact['location']['s3Location']['objectKey']
+                    inputzip = inartobject.split("/")
+                    s3.meta.client.download_file(inartbucket, inartobject, '/tmp/'+inputzip[2])
+                    zip_ref = zipfile.ZipFile('/tmp/'+inputzip[2], 'r')
+                    zip_ref.extractall('/tmp/')
+                    zip_ref.close()
+            def pack_artefact(event,s3):
+                outartbucket = event['CodePipeline.job']['data']['outputArtifacts'][0]['location']['s3Location']['bucketName']
+                outartobject = event['CodePipeline.job']['data']['outputArtifacts'][0]['location']['s3Location']['objectKey']
+                outputzip =  outartobject.split("/")
+                z = zipfile.ZipFile('/tmp/'+ outputzip[2], 'w')
+                z.write('/tmp/build_ami.json','build_ami.json')
+                z.write('/tmp/build-stack-configuration.json','build-stack-configuration.json')
+                z.close()
+                s3.meta.client.upload_file('/tmp/'+ outputzip[2], outartbucket, outartobject, ExtraArgs={'ServerSideEncryption': 'aws:kms'})
+                print(commands.getoutput('ls -Rv /tmp/'))
+            def signal_success(event,cpipeclient):
+                cpipeclient.put_job_success_result(
+                        jobId=event['CodePipeline.job']['id']
+                        )
+            def signal_failure(event,cpipeclient):
+                cpipeclient.put_job_failure_result(
+                        jobId=event['CodePipeline.job']['id'],
+                        failureDetails={'type': 'JobFailed','message': 'Lambda Execution Failed, Check Lambda Log'}
+                        )
+  ComposeBuildAMITemplateFunctionCustRes: 
+    Type: "AWS::Lambda::Function"
+    Properties: 
+      FunctionName: !Sub ${AWS::StackName}-codepipeline-compose_build_template_cust_res
+      Handler: "index.lambda_handler"
+      Role: 
+        Fn::GetAtt: 
+          - "LambdaExecutionRole"
+          - "Arn"
+      Runtime: "python2.7"
+      MemorySize: "512"
+      Timeout: "300"
+      Code: 
+        ZipFile: 
+            !Sub |
+            import base64, uuid, httplib, urlparse, json, boto3, commands, zipfile, StringIO, os, calendar, time
+            from botocore.client import Config
+            def lambda_handler(event, context):
+                print ('### EVENT OUTPUT ###')
+                print (json.dumps(event))
+                l = {"DependsOn": "EC2BuilderInstance","Type": "Custom::XSFN","Properties": {"Id": {"Ref": "EC2BuilderInstance"},"StackName": {"Ref": "AWS::StackName"}, "Region": {"Ref": "AWS::Region"},"stateMachineArn": {"Fn::ImportValue": {"Fn::Join": ["",[{"Ref":"PipelineStack"},"-AMIBakeCreateStepFuncMach"]]}}, "ServiceToken": {"Fn::ImportValue": {"Fn::Join": ["",[{"Ref":"PipelineStack"},"-AMIBakeExexStateMachine"]]}}}}
+                try:
+                    s3 = boto3.resource(
+                            's3', 
+                            aws_access_key_id= event['CodePipeline.job']['data']['artifactCredentials']['accessKeyId'],
+                            aws_secret_access_key= event['CodePipeline.job']['data']['artifactCredentials']['secretAccessKey'],
+                            aws_session_token= event['CodePipeline.job']['data']['artifactCredentials']['sessionToken'],
+                            config=Config(signature_version='s3v4')
+                            )
+                    cpipeclient = boto3.client('codepipeline')
+                    unpack_artefact(event,s3)
+                    ##PROCESS ARTEFACT###
+                    with open('/tmp/build_ami.json') as json_file:
+                        jsnd = json.load(json_file)
+                        jsnd['Resources']['XSFN'] = l
+                        print (json.dumps(jsnd))
+                        f = open('/tmp/build_ami.json','w')
+                        f.write(json.dumps(jsnd)) 
+                        f.close()
+                    #####################
+                    pack_artefact(event,s3)
+                    signal_success(event,cpipeclient)
+                except:
+                    signal_failure(event,cpipeclient)
+                    raise
+            def unpack_artefact(event,s3):  
+                input_artefacts = event['CodePipeline.job']['data']['inputArtifacts']
+                print(commands.getoutput('rm -Rvf /tmp/*'))
+                for inartefact in input_artefacts:
+                    inartbucket = inartefact['location']['s3Location']['bucketName']
+                    inartobject = inartefact['location']['s3Location']['objectKey']
+                    inputzip = inartobject.split("/")
+                    s3.meta.client.download_file(inartbucket, inartobject, '/tmp/'+inputzip[2])
+                    zip_ref = zipfile.ZipFile('/tmp/'+inputzip[2], 'r')
+                    zip_ref.extractall('/tmp/')
+                    zip_ref.close()
+            def pack_artefact(event,s3):
+                outartbucket = event['CodePipeline.job']['data']['outputArtifacts'][0]['location']['s3Location']['bucketName']
+                outartobject = event['CodePipeline.job']['data']['outputArtifacts'][0]['location']['s3Location']['objectKey']
+                outputzip =  outartobject.split("/")
+                z = zipfile.ZipFile('/tmp/'+ outputzip[2], 'w')
+                z.write('/tmp/build_ami.json','build_ami.json')
+                z.write('/tmp/build-stack-configuration.json','build-stack-configuration.json')
+                z.close()
+                s3.meta.client.upload_file('/tmp/'+ outputzip[2], outartbucket, outartobject, ExtraArgs={'ServerSideEncryption': 'aws:kms'})
+                print(commands.getoutput('ls -Rv /tmp/'))
+            def signal_success(event,cpipeclient):
+                cpipeclient.put_job_success_result(
+                        jobId=event['CodePipeline.job']['id']
+                        )
+            def signal_failure(event,cpipeclient):
+                cpipeclient.put_job_failure_result(
+                        jobId=event['CodePipeline.job']['id'],
+                        failureDetails={'type': 'JobFailed','message': 'Lambda Execution Failed, Check Lambda Log'}
+                        )
+  ComposeTestAMIConfigFunction: 
+    Type: "AWS::Lambda::Function"
+    Properties: 
+      FunctionName: !Sub ${AWS::StackName}-codepipeline-compose_test_config_file
+      Handler: "index.lambda_handler"
+      Role: 
+        Fn::GetAtt: 
+          - "LambdaExecutionRole"
+          - "Arn"
+      Runtime: "python2.7"
+      MemorySize: "512"
+      Timeout: "300"
+      Code: 
+        ZipFile: 
+            !Sub |
+            import base64, uuid, httplib, urlparse, json, boto3, commands, zipfile, StringIO, os, calendar, time
+            from botocore.client import Config
+            def lambda_handler(event, context):
+                print ('### EVENT OUTPUT ###')
+                print (json.dumps(event))
+                try:
+                    s3 = boto3.resource(
+                            's3', 
+                            aws_access_key_id= event['CodePipeline.job']['data']['artifactCredentials']['accessKeyId'],
+                            aws_secret_access_key= event['CodePipeline.job']['data']['artifactCredentials']['secretAccessKey'],
+                            aws_session_token= event['CodePipeline.job']['data']['artifactCredentials']['sessionToken'],
+                            config=Config(signature_version='s3v4')
+                            )
+                    cpipeclient = boto3.client('codepipeline')
+                    unpack_artefact(event,s3)
+                    ##PROCESS ARTEFACT###
+                    with open('/tmp/ProducedAMI') as json_boostrap_metadata:
+                        jsonProdAMI = json.load(json_boostrap_metadata)
+                        AMI = jsonProdAMI['CustomAMICreated']
+
+                    with open('/tmp/test-stack-configuration.json') as json_file:
+                        json_decoded = json.load(json_file)
+                        json_decoded['Parameters']['BaseAMI'] = AMI
+
+                        print (json.dumps(json_decoded))
+                        f = open('/tmp/test-stack-configuration.json','w')
+                        f.write(json.dumps(json_decoded)) 
+                        f.close()
+                    #####################
+                    pack_artefact(event,s3)
+                    signal_success(event,cpipeclient)
+                except:
+                    signal_failure(event,cpipeclient)
+                    raise 
+            def unpack_artefact(event,s3):  
+                input_artefacts = event['CodePipeline.job']['data']['inputArtifacts']
+                print(commands.getoutput('rm -Rvf /tmp/*'))
+                for inartefact in input_artefacts:
+                    inartbucket = inartefact['location']['s3Location']['bucketName']
+                    inartobject = inartefact['location']['s3Location']['objectKey']
+                    inputzip = inartobject.split("/")
+
+                    s3.meta.client.download_file(inartbucket, inartobject, '/tmp/'+inputzip[2])
+                    zip_ref = zipfile.ZipFile('/tmp/'+inputzip[2], 'r')
+                    zip_ref.extractall('/tmp/')
+                    zip_ref.close()
+            def pack_artefact(event,s3):
+                outartbucket = event['CodePipeline.job']['data']['outputArtifacts'][0]['location']['s3Location']['bucketName']
+                outartobject = event['CodePipeline.job']['data']['outputArtifacts'][0]['location']['s3Location']['objectKey']
+                outputzip =  outartobject.split("/")
+                z = zipfile.ZipFile('/tmp/'+ outputzip[2], 'w')
+                z.write('/tmp/test_ami.json','test_ami.json')
+                z.write('/tmp/test-stack-configuration.json','test-stack-configuration.json')
+                z.close()
+                s3.meta.client.upload_file('/tmp/'+ outputzip[2], outartbucket, outartobject, ExtraArgs={'ServerSideEncryption': 'aws:kms'})
+                print(commands.getoutput('ls -Rv /tmp/'))
+            def signal_success(event,cpipeclient):
+                cpipeclient.put_job_success_result(
+                        jobId=event['CodePipeline.job']['id']
+                        )
+            def signal_failure(event,cpipeclient):
+                cpipeclient.put_job_failure_result(
+                        jobId=event['CodePipeline.job']['id'],
+                        failureDetails={'type': 'JobFailed','message': 'Lambda Execution Failed, Check Lambda Log'}
+                        )
+  InjectDynamoDBTableFunction: 
+    Type: "AWS::Lambda::Function"
+    Properties: 
+      FunctionName: !Sub ${AWS::StackName}-codepipeline-record_ami_information
+      Handler: "index.lambda_handler"
+      Role: 
+        Fn::GetAtt: 
+          - "LambdaExecutionRole"
+          - "Arn"
+      Runtime: "python2.7"
+      MemorySize: "512"
+      Timeout: "300"
+      Code: 
+        ZipFile: 
+            !Sub |
+            import base64, uuid, httplib, urlparse, json, boto3, commands, zipfile, StringIO, os, calendar, time
+            from botocore.client import Config
+            def lambda_handler(event, context):
+                print ('### EVENT OUTPUT ###')
+                print (json.dumps(event))
+                try:
+                    s3 = boto3.resource(
+                            's3', 
+                            aws_access_key_id= event['CodePipeline.job']['data']['artifactCredentials']['accessKeyId'],
+                            aws_secret_access_key= event['CodePipeline.job']['data']['artifactCredentials']['secretAccessKey'],
+                            aws_session_token= event['CodePipeline.job']['data']['artifactCredentials']['sessionToken'],
+                            config=Config(signature_version='s3v4')
+                            )
+                    cpipeclient = boto3.client('codepipeline')
+                    unpack_artefact(event,s3)
+                    
+                    ##PROCESS ARTEFACT###
+                    with open('/tmp/ProducedAMI') as json_boostrap_metadata:
+                        jsonProdAMI = json.load(json_boostrap_metadata)
+                        
+                        AMI = jsonProdAMI['CustomAMICreated']
+                        SourceAMI = jsonProdAMI['SourceAMICreated']
+                        AMICreateTime = jsonProdAMI['CustomAMICreatedTime']
+                        REGION = '${AWS::Region}'
+
+                        dynamodb = boto3.resource('dynamodb',region_name=REGION)
+                        table = dynamodb.Table('${AMITable}')
+                        responsedynamodb = table.put_item(
+                           Item={
+                              'CreateDate': AMICreateTime,
+                              'ID': AMI,
+                              'Region': REGION,
+                              'SourceID': SourceAMI
+                            })
+                        
+                        print (responsedynamodb)
+                        BODY =  'Your New AMI is baked :) \n' + 'ID = ' + AMI + '\n' + 'REGION = ' + REGION + '\n'
+                        sns = boto3.client('sns')
+                        responsesns = sns.publish(
+                                TargetArn='${SNSTopic}',
+                                Message= BODY,
+                                Subject='DING~!!! A new AMI is Baked')
+                        print (responsesns)      
+                    #####################
+                    signal_success(event,cpipeclient)
+                except:
+                    signal_failure(event,cpipeclient)
+                    raise 
+            def unpack_artefact(event,s3):  
+                input_artefacts = event['CodePipeline.job']['data']['inputArtifacts']
+                print(commands.getoutput('rm -Rvf /tmp/*'))
+                for inartefact in input_artefacts:
+                    inartbucket = inartefact['location']['s3Location']['bucketName']
+                    inartobject = inartefact['location']['s3Location']['objectKey']
+                    inputzip = inartobject.split("/")
+
+                    s3.meta.client.download_file(inartbucket, inartobject, '/tmp/'+inputzip[2])
+                    zip_ref = zipfile.ZipFile('/tmp/'+inputzip[2], 'r')
+                    zip_ref.extractall('/tmp/')
+                    zip_ref.close()
+            def signal_success(event,cpipeclient):
+                cpipeclient.put_job_success_result(
+                        jobId=event['CodePipeline.job']['id']
+                        )
+            def signal_failure(event,cpipeclient):
+                cpipeclient.put_job_failure_result(
+                        jobId=event['CodePipeline.job']['id'],
+                        failureDetails={'type': 'JobFailed','message': 'Lambda Execution Failed, Check Lambda Log'}
+                        )
+  UserConfigRepository:
+    Type: AWS::CodeCommit::Repository
+    Properties:
+      RepositoryName: !Sub ${AWS::StackName}-userconfig
+      RepositoryDescription: "Code repository to store the build ami package"
+  CodeRepository:
+    Type: AWS::CodeCommit::Repository
+    Properties:
+      RepositoryName: !Sub ${AWS::StackName}-coderepo
+      RepositoryDescription: "Code repository to store the build ami package"
+  ArtifactStoreS3Bucket:
+      Type: "AWS::S3::Bucket"
+  ArtifactStoreS3BucketPolicy: 
+      Type: "AWS::S3::BucketPolicy"
+      Properties: 
+        Bucket: 
+          Ref: "ArtifactStoreS3Bucket"
+        PolicyDocument: 
+          Statement: 
+            - 
+              Action: 
+                - "s3:PutObject"
+              Effect: "Allow"
+              Resource: 
+                Fn::Join: 
+                  - ""
+                  - 
+                    - "arn:aws:s3:::"
+                    - 
+                      Ref: "ArtifactStoreS3Bucket"
+                    - "/*"
+              Principal: "*"
+              Condition: 
+                StringNotEquals: 
+                  s3:x-amz-server-side-encryption: 
+                    - "aws:kms"   
+  BuildAMICodePipeline: 
+    Type: "AWS::CodePipeline::Pipeline"
+    Properties: 
+      RoleArn: 
+        !GetAtt CodepipelineServiceRole.Arn
+      Stages: 
+        - 
+          Name: Source
+          Actions: 
+            - 
+              Name: DownloadArtefacts
+              ActionTypeId: 
+                Category: Source
+                Owner: AWS
+                Version: 1
+                Provider: CodeCommit
+              OutputArtifacts: 
+                - 
+                  Name: SourceOutputCode
+              Configuration: 
+                BranchName: master
+                RepositoryName: !Sub ${AWS::StackName}-coderepo
+              RunOrder: 1
+            - 
+              Name: DownloadConfigs
+              ActionTypeId: 
+                Category: Source
+                Owner: AWS
+                Version: 1
+                Provider: CodeCommit
+              OutputArtifacts: 
+                - 
+                  Name: SourceOutputConfig
+              Configuration: 
+                BranchName: master
+                RepositoryName: !Sub ${AWS::StackName}-userconfig
+              RunOrder: 1
+        - 
+          Name: ComposeBuildTemplate
+          Actions: 
+            - 
+              Name: InsertUserConfig
+              InputArtifacts: 
+                - 
+                  Name: SourceOutputCode
+                - 
+                  Name: SourceOutputConfig
+              OutputArtifacts:
+                - 
+                  Name: ComposeTemp1
+              ActionTypeId: 
+                Category: Invoke
+                Owner: AWS
+                Version: 1
+                Provider: Lambda
+              Configuration: 
+                FunctionName: 
+                  Ref: ComposeBuildAMITemplateFunction
+              RunOrder: 1
+            - 
+              Name: InsertOutput
+              InputArtifacts: 
+                - 
+                  Name: ComposeTemp1
+              OutputArtifacts:
+                - 
+                  Name: ComposeTemp2
+              ActionTypeId: 
+                Category: Invoke
+                Owner: AWS
+                Version: 1
+                Provider: Lambda
+              Configuration: 
+                FunctionName: 
+                  Ref: ComposeBuildAMITemplateFunctionOutputs
+              RunOrder: 2
+            - 
+              Name: InsertCustomResource
+              InputArtifacts: 
+                - 
+                  Name: ComposeTemp2
+              OutputArtifacts:
+                - 
+                  Name: BuildAMIOut1
+              ActionTypeId: 
+                Category: Invoke
+                Owner: AWS
+                Version: 1
+                Provider: Lambda
+              Configuration: 
+                FunctionName: 
+                  Ref: ComposeBuildAMITemplateFunctionCustRes
+              RunOrder: 3
+        - 
+          Name: BuildCustomAMI
+          Actions: 
+            - 
+              Name: DeployBuildAMIStack
+              InputArtifacts: 
+                - 
+                  Name: BuildAMIOut1
+              OutputArtifacts:
+                - 
+                  Name: BuildAMIOut2
+              ActionTypeId: 
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: CloudFormation
+              Configuration: 
+                RoleArn: !GetAtt CodepipelineServiceRole.Arn
+                ActionMode: "REPLACE_ON_FAILURE"
+                Capabilities: "CAPABILITY_NAMED_IAM"
+                StackName: 
+                  Fn::Join:
+                  - ''
+                  - - !Ref AWS::StackName
+                    - "-build-ami-stack"
+                OutputFileName: "ProducedAMI"
+                TemplateConfiguration: 
+                  Fn::Join:
+                  - ''
+                  - - "BuildAMIOut1::"
+                    - !Ref BuildAMIConfig
+                TemplatePath: 
+                  Fn::Join:
+                  - ''
+                  - - "BuildAMIOut1::"
+                    - !Ref BuildAMITemplate
+              RunOrder: 1
+            - 
+              Name: DeleteBuildAMIStack
+              RoleArn: 
+                 !GetAtt CodepipelineServiceRole.Arn
+              ActionTypeId: 
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: CloudFormation
+              Configuration: 
+                RoleArn: !GetAtt CodepipelineServiceRole.Arn
+                ActionMode: "DELETE_ONLY"
+                StackName: 
+                  Fn::Join:
+                  - ''
+                  - - !Ref AWS::StackName
+                    - "-build-ami-stack"
+              RunOrder: 2
+        - 
+          Name: TestCustomAMI
+          Actions: 
+            - 
+              Name: BuildTestAMIConfig
+              InputArtifacts: 
+                - 
+                  Name: BuildAMIOut2
+                - 
+                  Name: SourceOutputCode
+              OutputArtifacts:
+                - 
+                  Name: TestAMIConfigOut
+              ActionTypeId: 
+                Category: Invoke
+                Owner: AWS
+                Version: 1
+                Provider: Lambda
+              Configuration:
+                FunctionName: 
+                  Ref: ComposeTestAMIConfigFunction
+              RunOrder: 1
+            - 
+              Name: DeployTestAMIStack
+              InputArtifacts: 
+                - 
+                  Name: TestAMIConfigOut
+              OutputArtifacts:
+                - 
+                  Name: TestAMIOutput
+              ActionTypeId: 
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: CloudFormation
+              Configuration: 
+                RoleArn: !GetAtt CodepipelineServiceRole.Arn
+                ActionMode: "REPLACE_ON_FAILURE"
+                Capabilities: "CAPABILITY_NAMED_IAM"
+                StackName: 
+                  Fn::Join:
+                  - ''
+                  - - !Ref AWS::StackName
+                    - "-test-ami-stack"
+                OutputFileName: "TestOutput"
+                TemplateConfiguration: 
+                  Fn::Join:
+                  - ''
+                  - - "TestAMIConfigOut::"
+                    - !Ref TestAMIConfig
+                TemplatePath: 
+                  Fn::Join:
+                  - ''
+                  - - "TestAMIConfigOut::"
+                    - !Ref TestAMITemplate
+              RunOrder: 2
+            - 
+              Name: CheckAMIDeployed
+              InputArtifacts: 
+                - 
+                  Name: TestAMIOutput
+              ActionTypeId: 
+                Category: Invoke
+                Owner: AWS
+                Version: 1
+                Provider: Lambda
+              Configuration: 
+                FunctionName: 
+                  Ref: TestAMIFunction
+              RunOrder: 3
+            - 
+              Name: DeleteTestAMIStack
+              ActionTypeId: 
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: CloudFormation
+              Configuration: 
+                RoleArn: !GetAtt CodepipelineServiceRole.Arn
+                ActionMode: "DELETE_ONLY"
+                StackName: 
+                  Fn::Join:
+                  - ''
+                  - - !Ref AWS::StackName
+                    - "-test-ami-stack"
+              RunOrder: 4
+        - 
+          Name: RecordAMIToTable
+          Actions: 
+            - 
+              Name: InsertRecord
+              InputArtifacts: 
+                - 
+                  Name: BuildAMIOut2
+              ActionTypeId: 
+                Category: Invoke
+                Owner: AWS
+                Version: 1
+                Provider: Lambda
+              Configuration:
+                FunctionName: 
+                  Ref: InjectDynamoDBTableFunction
+              RunOrder: 1
+      ArtifactStore: 
+        Type: S3
+        Location: 
+          Ref: ArtifactStoreS3Bucket
+

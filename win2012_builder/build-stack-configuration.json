@@ -1,0 +1,8 @@
+{
+  "Parameters": {
+    "InstanceType": "r4.4xlarge",
+    "BaseAMI": "ami-24e64944",
+    "Keypair": "us-west-2",
+    "PipelineStack": "WIN2012-bake-pipe"
+  }
+}

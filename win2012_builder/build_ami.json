@@ -1,0 +1,570 @@
+{
+  "Resources": {
+    "EC2BuilderInstance": {
+      "CreationPolicy": {
+        "ResourceSignal": {
+          "Count": 1,
+          "Timeout": "PT12H"
+        }
+      },
+      "Metadata": {
+        "AWS::CloudFormation::Init": {
+          "cfn-signal": {
+            "commands": {
+              "01-signal-success": {
+                "command": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "cfn-signal.exe -e 0 --stack ",
+                      {
+                        "Ref": "AWS::StackName"
+                      },
+                      " --resource EC2BuilderInstance",
+                      " --region ",
+                      {
+                        "Ref": "AWS::Region"
+                      }
+                    ]
+                  ]
+                }
+              }
+            }
+          },
+          "pre-config": {
+            "packages": {
+              "msi": {
+                "awscli": "https://s3.amazonaws.com/aws-cli/AWSCLI64.msi"
+              }
+            },
+            "files": {
+              "c:\\Program Files\\Amazon\\Ec2ConfigService\\Settings\\AWS.EC2.Windows.CloudWatch.json": {
+                "content": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "{\n",
+                      "  \"EngineConfiguration\": {\n",
+                      "    \"PollInterval\": \"00:00:15\",\n",
+                      "    \"Components\": [\n",
+                      "      {\n",
+                      "        \"Id\": \"ApplicationEventLog\",\n",
+                      "        \"FullName\": \"AWS.EC2.Windows.CloudWatch.EventLog.EventLogInputComponent,AWS.EC2.Windows.CloudWatch\",\n",
+                      "        \"Parameters\": {\n",
+                      "          \"LogName\": \"Application\",\n",
+                      "          \"Levels\": \"1\"\n",
+                      "        }\n",
+                      "      },\n",
+                      "      {\n",
+                      "        \"Id\": \"SystemEventLog\",\n",
+                      "        \"FullName\": \"AWS.EC2.Windows.CloudWatch.EventLog.EventLogInputComponent,AWS.EC2.Windows.CloudWatch\",\n",
+                      "        \"Parameters\": {\n",
+                      "          \"LogName\": \"System\",\n",
+                      "          \"Levels\": \"7\"\n",
+                      "        }\n",
+                      "      },\n",
+                      "      {\n",
+                      "        \"Id\": \"SecurityEventLog\",\n",
+                      "        \"FullName\": \"AWS.EC2.Windows.CloudWatch.EventLog.EventLogInputComponent,AWS.EC2.Windows.CloudWatch\",\n",
+                      "        \"Parameters\": {\n",
+                      "          \"LogName\": \"Security\",\n",
+                      "          \"Levels\": \"7\"\n",
+                      "        }\n",
+                      "      },\n",
+                      "      {\n",
+                      "        \"Id\": \"ETW\",\n",
+                      "        \"FullName\": \"AWS.EC2.Windows.CloudWatch.EventLog.EventLogInputComponent,AWS.EC2.Windows.CloudWatch\",\n",
+                      "        \"Parameters\": {\n",
+                      "          \"LogName\": \"Microsoft-Windows-WinINet/Analytic\",\n",
+                      "          \"Levels\": \"7\"\n",
+                      "        }\n",
+                      "      },\n",
+                      "      {\n",
+                      "        \"Id\": \"IIS\",\n",
+                      "        \"FullName\": \"AWS.EC2.Windows.CloudWatch.IisLog.IisLogInputComponent,AWS.EC2.Windows.CloudWatch\",\n",
+                      "        \"Parameters\": {\n",
+                      "          \"LogDirectoryPath\": \"C:\\\\inetpub\\\\logs\\\\LogFiles\\\\W3SVC1\"\n",
+                      "        }\n",
+                      "      },\n",
+                      "      {\n",
+                      "        \"Id\": \"CFN\",\n",
+                      "        \"FullName\": \"AWS.EC2.Windows.CloudWatch.CustomLog.CustomLogInputComponent,AWS.EC2.Windows.CloudWatch\",\n",
+                      "        \"Parameters\": {\n",
+                      "          \"LogDirectoryPath\": \"C:\\\\cfn\\\\log\\\\\",\n",
+                      "          \"TimestampFormat\": \"MM/dd/yyyy HH:mm:ss\",\n",
+                      "          \"Encoding\": \"UTF-8\",\n",
+                      "          \"Filter\": \"\",\n",
+                      "          \"CultureName\": \"en-US\",\n",
+                      "          \"TimeZoneKind\": \"Local\"\n",
+                      "        }\n",
+                      "      },\n",
+                      "      {\n",
+                      "        \"Id\": \"EC2Config\",\n",
+                      "        \"FullName\": \"AWS.EC2.Windows.CloudWatch.CustomLog.CustomLogInputComponent,AWS.EC2.Windows.CloudWatch\",\n",
+                      "        \"Parameters\": {\n",
+                      "          \"LogDirectoryPath\": \"C:\\\\Program Files\\\\Amazon\\\\Ec2ConfigService\\\\Logs\",\n",
+                      "          \"TimestampFormat\": \"MM/dd/yyyy HH:mm:ss\",\n",
+                      "          \"Encoding\": \"UTF-8\",\n",
+                      "          \"Filter\": \"\",\n",
+                      "          \"CultureName\": \"en-US\",\n",
+                      "          \"TimeZoneKind\": \"Local\"\n",
+                      "        }\n",
+                      "      },\n",
+                      "      {\n",
+                      "        \"Id\": \"SSMAgent\",\n",
+                      "        \"FullName\": \"AWS.EC2.Windows.CloudWatch.CustomLog.CustomLogInputComponent,AWS.EC2.Windows.CloudWatch\",\n",
+                      "        \"Parameters\": {\n",
+                      "          \"LogDirectoryPath\": \"C:\\\\ProgramData\\\\Amazon\\\\SSM\\\\Logs\",\n",
+                      "          \"TimestampFormat\": \"MM/dd/yyyy HH:mm:ss\",\n",
+                      "          \"Encoding\": \"UTF-8\",\n",
+                      "          \"Filter\": \"\",\n",
+                      "          \"CultureName\": \"en-US\",\n",
+                      "          \"TimeZoneKind\": \"Local\"\n",
+                      "        }\n",
+                      "      },\n",
+                      "      {\n",
+                      "        \"Id\": \"PerformanceCounter\",\n",
+                      "        \"FullName\": \"AWS.EC2.Windows.CloudWatch.PerformanceCounterComponent.PerformanceCounterInputComponent,AWS.EC2.Windows.CloudWatch\",\n",
+                      "        \"Parameters\": {\n",
+                      "          \"CategoryName\": \"Memory\",\n",
+                      "          \"CounterName\": \"Available MBytes\",\n",
+                      "          \"InstanceName\": \"\",\n",
+                      "          \"MetricName\": \"Memory\",\n",
+                      "          \"Unit\": \"Megabytes\",\n",
+                      "          \"DimensionName\": \"\",\n",
+                      "          \"DimensionValue\": \"\"\n",
+                      "        }\n",
+                      "      },\n",
+                      "      {\n",
+                      "        \"Id\": \"IISLogs\",\n",
+                      "        \"FullName\": \"AWS.EC2.Windows.CloudWatch.CloudWatchLogsOutput,AWS.EC2.Windows.CloudWatch\",\n",
+                      "        \"Parameters\": {\n",
+                      "          \"AccessKey\": \"\",\n",
+                      "          \"SecretKey\": \"\",\n",
+                      "          \"Region\": \"",
+                      {
+                        "Ref": "AWS::Region"
+                      },
+                      "\",\n",
+                      "          \"LogGroup\": \"",
+                      {
+                        "Ref": "PipelineStack"
+                      },
+                      "-BakeLogGroupIIS\",\n",
+                      "          \"LogStream\": \"{instance_id}/IIS\"\n",
+                      "        }\n",
+                      "      },\n",
+                      "      {\n",
+                      "        \"Id\": \"ApplicationSystemLogs\",\n",
+                      "        \"FullName\": \"AWS.EC2.Windows.CloudWatch.CloudWatchLogsOutput,AWS.EC2.Windows.CloudWatch\",\n",
+                      "        \"Parameters\": {\n",
+                      "          \"AccessKey\": \"\",\n",
+                      "          \"SecretKey\": \"\",\n",
+                      "          \"Region\": \"",
+                      {
+                        "Ref": "AWS::Region"
+                      },
+                      "\",\n",
+                      "          \"LogGroup\": \"",
+                      {
+                        "Ref": "PipelineStack"
+                      },
+                      "-BakeLogGroupApplicationSystems\",\n",
+                      "          \"LogStream\": \"{instance_id}/ApplicationSystems\"\n",
+                      "        }\n",
+                      "      },\n",
+                      "      {\n",
+                      "        \"Id\": \"SecurityLogs\",\n",
+                      "        \"FullName\": \"AWS.EC2.Windows.CloudWatch.CloudWatchLogsOutput,AWS.EC2.Windows.CloudWatch\",\n",
+                      "        \"Parameters\": {\n",
+                      "          \"AccessKey\": \"\",\n",
+                      "          \"SecretKey\": \"\",\n",
+                      "          \"Region\": \"",
+                      {
+                        "Ref": "AWS::Region"
+                      },
+                      "\",\n",
+                      "          \"LogGroup\": \"",
+                      {
+                        "Ref": "PipelineStack"
+                      },
+                      "-BakeLogGroupSecurity\",\n",
+                      "          \"LogStream\": \"{instance_id}/Security\"\n",
+                      "        }\n",
+                      "      },\n",
+                      "      {\n",
+                      "        \"Id\": \"ETWLogs\",\n",
+                      "        \"FullName\": \"AWS.EC2.Windows.CloudWatch.CloudWatchLogsOutput,AWS.EC2.Windows.CloudWatch\",\n",
+                      "        \"Parameters\": {\n",
+                      "          \"AccessKey\": \"\",\n",
+                      "          \"SecretKey\": \"\",\n",
+                      "          \"Region\": \"",
+                      {
+                        "Ref": "AWS::Region"
+                      },
+                      "\",\n",
+                      "          \"LogGroup\": \"",
+                      {
+                        "Ref": "PipelineStack"
+                      },
+                      "-BakeLogGroupETW\",\n",
+                      "          \"LogStream\": \"{instance_id}/ETW\"\n",
+                      "        }\n",
+                      "      },\n",
+                      "      {\n",
+                      "        \"Id\": \"CFNLogs\",\n",
+                      "        \"FullName\": \"AWS.EC2.Windows.CloudWatch.CloudWatchLogsOutput,AWS.EC2.Windows.CloudWatch\",\n",
+                      "        \"Parameters\": {\n",
+                      "          \"AccessKey\": \"\",\n",
+                      "          \"SecretKey\": \"\",\n",
+                      "          \"Region\": \"",
+                      {
+                        "Ref": "AWS::Region"
+                      },
+                      "\",\n",
+                      "          \"LogGroup\": \"",
+                      {
+                        "Ref": "PipelineStack"
+                      },
+                      "-BakeLogGroupCFN\",\n",
+                      "          \"LogStream\": \"{instance_id}/CFN\"\n",
+                      "        }\n",
+                      "      },\n",
+                      "      {\n",
+                      "        \"Id\": \"SSMAgentLogs\",\n",
+                      "        \"FullName\": \"AWS.EC2.Windows.CloudWatch.CloudWatchLogsOutput,AWS.EC2.Windows.CloudWatch\",\n",
+                      "        \"Parameters\": {\n",
+                      "          \"AccessKey\": \"\",\n",
+                      "          \"SecretKey\": \"\",\n",
+                      "          \"Region\": \"",
+                      {
+                        "Ref": "AWS::Region"
+                      },
+                      "\",\n",
+                      "          \"LogGroup\": \"",
+                      {
+                        "Ref": "PipelineStack"
+                      },
+                      "-BakeLogGroupSSM\",\n",
+                      "          \"LogStream\": \"{instance_id}/SSM\"\n",
+                      "        }\n",
+                      "      },\n",
+                      "      {\n",
+                      "        \"Id\": \"EC2ConfigLogs\",\n",
+                      "        \"FullName\": \"AWS.EC2.Windows.CloudWatch.CloudWatchLogsOutput,AWS.EC2.Windows.CloudWatch\",\n",
+                      "        \"Parameters\": {\n",
+                      "          \"AccessKey\": \"\",\n",
+                      "          \"SecretKey\": \"\",\n",
+                      "          \"Region\": \"",
+                      {
+                        "Ref": "AWS::Region"
+                      },
+                      "\",\n",
+                      "          \"LogGroup\": \"",
+                      {
+                        "Ref": "PipelineStack"
+                      },
+                      "-BakeLogGroupEC2Config\",\n",
+                      "          \"LogStream\": \"{instance_id}/EC2Config\"\n",
+                      "        }\n",
+                      "      },\n",
+                      "      {\n",
+                      "        \"Id\": \"CloudWatch\",\n",
+                      "        \"FullName\": \"AWS.EC2.Windows.CloudWatch.CloudWatch.CloudWatchOutputComponent,AWS.EC2.Windows.CloudWatch\",\n",
+                      "        \"Parameters\": {\n",
+                      "          \"AccessKey\": \"\",\n",
+                      "          \"SecretKey\": \"\",\n",
+                      "          \"Region\": \"",
+                      {
+                        "Ref": "AWS::Region"
+                      },
+                      "\",\n",
+                      "          \"NameSpace\": \"Windows/Default\"\n",
+                      "        }\n",
+                      "      }\n",
+                      "    ],\n",
+                      "    \"Flows\": {\n",
+                      "      \"Flows\": [\n",
+                      "        \"(ApplicationEventLog,SystemEventLog),ApplicationSystemLogs\",\n",
+                      "        \"SecurityEventLog,SecurityLogs\",\n",
+                      "        \"ETW,ETWLogs\",\n",
+                      "        \"CFN,CFNLogs\",\n",
+                      "        \"IIS,IISLogs\",\n",
+                      "        \"EC2Config,EC2ConfigLogs\",\n",
+                      "        \"SSMAgent,SSMAgentLogs\",\n",
+                      "        \"PerformanceCounter,CloudWatch,\"\n",
+                      "      ]\n",
+                      "    }\n",
+                      "  }\n",
+                      "}\n"
+                    ]
+                  ]
+                }
+              },
+              "c:\\cfn\\setCloudWatch.ps1": {
+                "content": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "$EC2SettingsFile=\"c:\\Program Files\\Amazon\\Ec2ConfigService\\Settings\\Config.xml\"\n",
+                      "$xml = [xml](get-content $EC2SettingsFile)\n",
+                      "$xmlElement = $xml.get_DocumentElement()\n",
+                      "$xmlElementToModify = $xmlElement.Plugins\n",
+                      "foreach ($element in $xmlElementToModify.Plugin)\n",
+                      "{\n",
+                      "if ($element.name -eq \"AWS.EC2.Windows.CloudWatch.PlugIn\")\n",
+                      "{\n",
+                      "$element.State=\"Enabled\"\n",
+                      "}\n",
+                      "}\n",
+                      "$xml.Save($EC2SettingsFile)\n"
+                    ]
+                  ]
+                }
+              }
+            },
+            "commands": {
+              "1-set-CloudWatch": {
+                "command": "PowerShell.exe -ExecutionPolicy Unrestricted c:\\cfn\\setCloudWatch.ps1"
+              },
+              "2-restart-Computer": {
+                "command": "PowerShell.exe Restart-Computer -Force",
+                "waitAfterCompletion": "forever"
+              }
+            }
+          },
+          "shutdown": {
+            "files": {
+              "c:\\cfn\\setPassword.ps1": {
+                "content": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "$EC2SettingsFile=\"c:\\Program Files\\Amazon\\Ec2ConfigService\\Settings\\Config.xml\"\n",
+                      "$xml = [xml](get-content $EC2SettingsFile)\n",
+                      "$xmlElement = $xml.get_DocumentElement()\n",
+                      "$xmlElementToModify = $xmlElement.Plugins\n",
+                      "foreach ($element in $xmlElementToModify.Plugin)\n",
+                      "{\n",
+                      "if ($element.name -eq \"Ec2SetPassword\")\n",
+                      "{\n",
+                      "$element.State=\"Enabled\"\n",
+                      "}\n",
+                      "}\n",
+                      "$xml.Save($EC2SettingsFile)\n"
+                    ]
+                  ]
+                }
+              },
+              "c:\\cfn\\setUserData.ps1": {
+                "content": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "$EC2SettingsFile=\"c:\\Program Files\\Amazon\\Ec2ConfigService\\Settings\\Config.xml\"\n",
+                      "$xml = [xml](get-content $EC2SettingsFile)\n",
+                      "$xmlElement = $xml.get_DocumentElement()\n",
+                      "$xmlElementToModify = $xmlElement.Plugins\n",
+                      "foreach ($element in $xmlElementToModify.Plugin)\n",
+                      "{\n",
+                      "if ($element.name -eq \"Ec2HandleUserData\")\n",
+                      "{\n",
+                      "$element.State=\"Enabled\"\n",
+                      "}\n",
+                      "}\n",
+                      "$xml.Save($EC2SettingsFile)\n"
+                    ]
+                  ]
+                }
+              },
+              "c:\\cfn\\setComputerName.ps1": {
+                "content": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "$EC2SettingsFile=\"c:\\Program Files\\Amazon\\Ec2ConfigService\\Settings\\Config.xml\"\n",
+                      "$xml = [xml](get-content $EC2SettingsFile)\n",
+                      "$xmlElement = $xml.get_DocumentElement()\n",
+                      "$xmlElementToModify = $xmlElement.Plugins\n",
+                      "foreach ($element in $xmlElementToModify.Plugin)\n",
+                      "{\n",
+                      "if ($element.name -eq \"EC2SetComputerName\")\n",
+                      "{\n",
+                      "$element.State=\"Enabled\"\n",
+                      "}\n",
+                      "}\n",
+                      "$xml.Save($EC2SettingsFile)\n"
+                    ]
+                  ]
+                }
+              }
+            },
+            "commands": {
+              "01-set-Password": {
+                "command": "PowerShell.exe -ExecutionPolicy Unrestricted c:\\cfn\\setPassword.ps1"
+              },
+              "02-set-UserData": {
+                "command": "PowerShell.exe -ExecutionPolicy Unrestricted c:\\cfn\\setUserData.ps1"
+              },
+              "03-clean-cloudwatchconfig": {
+                "command": "del /f \"c:\\Program Files\\Amazon\\SSM\\Plugins\\awscloudWatch\\AWS.EC2.Windows.CloudWatch.json\""
+              },
+              "04-clean-cloudwatchconfig": {
+                "command": "del /f \"c:\\Program Files\\Amazon\\Ec2ConfigService\\Settings\\AWS.EC2.Windows.CloudWatch.json\""
+              },
+              "05-disable-cfn-hup": {
+                "command": "sc config \"cfn-hup\" start= disabled\""
+              },
+              "06-sysprep": {
+                "command": "\"C:\\Program Files\\Amazon\\Ec2ConfigService\\ec2config.exe\" -sysprep"
+              }
+            }
+          },
+          "user-config": {},
+          "cfn-hup-config": {
+            "files": {
+              "c:\\cfn\\cfn-hup.conf": {
+                "content": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "[main]\n",
+                      "stack=",
+                      {
+                        "Ref": "AWS::StackId"
+                      },
+                      "\n",
+                      "region=",
+                      {
+                        "Ref": "AWS::Region"
+                      },
+                      "\n"
+                    ]
+                  ]
+                }
+              },
+              "c:\\cfn\\hooks.d\\cfn-auto-reloader.conf": {
+                "content": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "[cfn-auto-reloader-hook]\n",
+                      "triggers=post.update\n",
+                      "path=Resources.EC2BuilderInstance.Metadata.AWS::CloudFormation::Init\n",
+                      "action=cfn-init.exe",
+                      "       --stack ",
+                      {
+                        "Ref": "AWS::StackId"
+                      },
+                      "       --resource EC2BuilderInstance",
+                      "       --region ",
+                      {
+                        "Ref": "AWS::Region"
+                      },
+                      "\n"
+                    ]
+                  ]
+                }
+              }
+            },
+            "services": {
+              "windows": {
+                "cfn-hup": {
+                  "files": [
+                    "c:\\cfn\\cfn-hup.conf",
+                    "c:\\cfn\\hooks.d\\cfn-auto-reloader.conf"
+                  ],
+                  "ensureRunning": "true",
+                  "enabled": "true"
+                }
+              }
+            }
+          },
+          "configSets": {
+            "bootstrap": [
+              "pre-config",
+              "cfn-hup-config",
+              "user-config",
+              "cfn-signal",
+              "shutdown"
+            ]
+          }
+        }
+      },
+      "Type": "AWS::EC2::Instance",
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Join": [
+                "",
+                [
+                  {
+                    "Ref": "AWS::StackName"
+                  },
+                  "-",
+                  "EC2BuilderInstance"
+                ]
+              ]
+            }
+          }
+        ],
+        "IamInstanceProfile": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${PipelineStack}-AMIBuilderInstanceProfile"
+          }
+        },
+        "UserData": {
+          "Fn::Base64": {
+            "Fn::Join": [
+              "",
+              [
+                "<script>\n",
+                "cfn-init.exe ",
+                "       --stack ",
+                {
+                  "Ref": "AWS::StackId"
+                },
+                "       --resource EC2BuilderInstance ",
+                "       --region ",
+                {
+                  "Ref": "AWS::Region"
+                },
+                "       --configsets bootstrap ",
+                "</script>"
+              ]
+            ]
+          }
+        },
+        "KeyName": {
+          "Ref": "Keypair"
+        },
+        "InstanceType": {
+          "Ref": "InstanceType"
+        },
+        "ImageId": {
+          "Ref": "BaseAMI"
+        }
+      }
+    }
+  },
+  "Parameters": {
+    "Keypair": {
+      "Type": "AWS::EC2::KeyPair::KeyName",
+      "Default": "us-west-2"
+    },
+    "InstanceType": {
+      "Type": "String",
+      "Default": "r4.2xlarge"
+    },
+    "BaseAMI": {
+      "Type": "String",
+      "Default": "ami-24e64944"
+    },
+    "PipelineStack": {
+      "Type": "String",
+      "Default": "baking-ami-pipe"
+    }
+  }
+}

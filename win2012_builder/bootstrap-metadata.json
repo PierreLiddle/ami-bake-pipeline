@@ -1,0 +1,10 @@
+{
+  "commands": {
+    "1-run-enablepsexec": {
+      "command": "powershell.exe Set-ExecutionPolicy Unrestricted"
+    },
+    "2-install-iis": {
+      "command": "powershell.exe add-windowsfeature Web-Server"
+    }
+  }
+}
