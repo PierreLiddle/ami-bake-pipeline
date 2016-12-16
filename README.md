@@ -59,6 +59,10 @@ Before commiting, please refer to the "Use Guide" above ensure the parameters ar
 "{thisrepo}/linux_builder/build_ami.json" ---> "{PipelineStack}-coderepo"
 "{thisrepo}/linux_builder/bootstrap-metadata.json" ---> "{PipelineStack}-userconfig"
 ```
+Follow this link to set up connection to codecommit :
+http://docs.aws.amazon.com/codecommit/latest/userguide/setting-up.html
+
+
 ### Building Windows2012 AMI
 To deploy "{thisrepo}/win2012_builder/*" consists of all the json files you need to commit to the "{PipelineStack}-coderepo" and "{PipelineStack}-userconfig" 
 Before commiting, please refer to the "Use Guide" above ensure the parameters are adjusted accordingly to your use.
@@ -71,4 +75,7 @@ Before commiting, please refer to the "Use Guide" above ensure the parameters ar
 "{thisrepo}/win2012_builder/build_ami.json" ---> "{PipelineStack}-coderepo"
 "{thisrepo}/win2012_builder/bootstrap-metadata.json" ---> "{PipelineStack}-userconfig"
 ```
+Follow this link to set up connection to codecommit :
+http://docs.aws.amazon.com/codecommit/latest/userguide/setting-up.html
+
 
