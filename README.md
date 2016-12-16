@@ -18,7 +18,8 @@ We will refer this stack as {PipelineStack} going forward.
 We will refer this as {LogGroupStack} going forward.
 
 * Open CodeCommit Console, and locate the 2 repositories created named :
-{PipelineStack}-coderepo and {PipelineStack}-userconfig
+{PipelineStack}-coderepo  
+{PipelineStack}-userconfig
 
 * Clone these 2 repositories locally. (follow below instructions)
 http://docs.aws.amazon.com/codecommit/latest/userguide/how-to-connect.html
