@@ -31,18 +31,20 @@ http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-init.
 
 [build-stack-configuration.json]
 ```sh
-"InstanceType": "r4.4xlarge" --> This will be the Instance type you want to use to bake the image
-"BaseAMI": "ami-24e64944", --> This will be the base public AMI ID in the region you want to use.
-"Keypair": "us-west-2", --> This will be the keypair to assign to the Instance.
-"PipelineStack": "WIN2012-bake-pipe" --> This will need to be the {PipelineStack} name you created previously.
+"InstanceType": "r4.4xlarge" 			--> This will be the Instance type you want to use to bake the image
+"BaseAMI": "ami-24e64944", 				--> This will be the base public AMI ID in the region you want to use.
+"Keypair": "us-west-2", 				--> This will be the keypair to assign to the Instance.
+"PipelineStack": "WIN2012-bake-pipe" 	--> This will need to be the {PipelineStack} name you created previously. 
+											(NEEDED FOR SENDING LOGS TO CLOUDWATCH)
 ```
 
 [test-stack-configuration.json]
 ```sh
-"InstanceType": "r4.4xlarge" --> This will be the Instance type you want to use to launch the test instance
-"BaseAMI": "******", --> This will be updated by the pipeline, you can leave it blank
-"Keypair": "us-west-2", --> This will be the keypair to assign to the Instance.
-"PipelineStack": "WIN2012-bake-pipe" --> This will need to be the {PipelineStack} name you created previously.
+"InstanceType": "r4.4xlarge" 			--> This will be the Instance type you want to use to launch the test instance
+"BaseAMI": "******", 					--> This will be updated by the pipeline, you can leave it blank
+"Keypair": "us-west-2", 				--> This will be the keypair to assign to the Instance.
+"PipelineStack": "WIN2012-bake-pipe" 	--> This will need to be the {PipelineStack} name you created previously.
+											(NEEDED FOR SENDING LOGS TO CLOUDWATCH)
 ```
 
 ### Building Linux AMI   
