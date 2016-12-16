@@ -53,11 +53,11 @@ Before commiting, please refer to the "Use Guide" above ensure the parameters ar
 
 * Download and Commit below files into the designated repositories created by the pipeline stack above.
 ```sh
-"{thisrepo}/linux_builder/test-stack-configuration.json" ---> "{PipelineStack}-coderepo" 
-"{thisrepo}/linux_builder/build-stack-configuration.json" ---> "{PipelineStack}-coderepo"
-"{thisrepo}/linux_builder/test_ami.json" ---> "{PipelineStack}-coderepo"
-"{thisrepo}/linux_builder/build_ami.json" ---> "{PipelineStack}-coderepo"
-"{thisrepo}/linux_builder/bootstrap-metadata.json" ---> "{PipelineStack}-userconfig"
+"{thisrepo}/linux_builder/test-stack-configuration.json" 	---> "{PipelineStack}-coderepo" 
+"{thisrepo}/linux_builder/build-stack-configuration.json" 	---> "{PipelineStack}-coderepo"
+"{thisrepo}/linux_builder/test_ami.json" 					---> "{PipelineStack}-coderepo"
+"{thisrepo}/linux_builder/build_ami.json" 					---> "{PipelineStack}-coderepo"
+"{thisrepo}/linux_builder/bootstrap-metadata.json" 			---> "{PipelineStack}-userconfig"
 ```
 Follow this link to set up connection to codecommit :
 http://docs.aws.amazon.com/codecommit/latest/userguide/setting-up.html
@@ -69,11 +69,11 @@ Before commiting, please refer to the "Use Guide" above ensure the parameters ar
 
 * Download and Commit below files into the designated repositories created by the pipeline stack above.
 ```sh
-"{thisrepo}/win2012_builder/test-stack-configuration.json" ---> "{PipelineStack}-coderepo" 
+"{thisrepo}/win2012_builder/test-stack-configuration.json" 	---> "{PipelineStack}-coderepo" 
 "{thisrepo}/win2012_builder/build-stack-configuration.json" ---> "{PipelineStack}-coderepo"
-"{thisrepo}/win2012_builder/test_ami.json" ---> "{PipelineStack}-coderepo"
-"{thisrepo}/win2012_builder/build_ami.json" ---> "{PipelineStack}-coderepo"
-"{thisrepo}/win2012_builder/bootstrap-metadata.json" ---> "{PipelineStack}-userconfig"
+"{thisrepo}/win2012_builder/test_ami.json" 					---> "{PipelineStack}-coderepo"
+"{thisrepo}/win2012_builder/build_ami.json"					---> "{PipelineStack}-coderepo"
+"{thisrepo}/win2012_builder/bootstrap-metadata.json" 		---> "{PipelineStack}-userconfig"
 ```
 Follow this link to set up connection to codecommit :
 http://docs.aws.amazon.com/codecommit/latest/userguide/setting-up.html
